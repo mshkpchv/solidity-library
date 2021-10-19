@@ -13,24 +13,28 @@ contract Library is Owner {
     // The users should not be able to borrow a book more times than the copies in the libraries unless copy is returned.
     // Everyone should be able to see the addresses of all people that have ever borrowed a given book.
     Book[] private books;
-    mapping (string => uint16) private inStockBooks;
     mapping (string => address[]) private borrowHistory;
-    mapping (address => mapping(string => bool)) private usersBooks;
-    
+    mapping (address => mapping(string => bool)) private usersBooks;    
+    mapping (string => BookRegistry) private registry;
 
     struct Book {
         string isbn;
         string title;
         string author;
     }
+
+    struct BookRegistry{
+        uint16 count;
+        uint16 availability;
+    }
  
     modifier existsCopies(string memory _isbn){
-        require(inStockBooks[_isbn] >= 1);
+        require(registry[_isbn].availability >= 1);
         _;
     }
     
     modifier existsBook(string memory _isbn){
-        require(inStockBooks[_isbn] > 0);
+        require(registry[_isbn].count > 0);
         _;
     }
     constructor() {
@@ -42,11 +46,11 @@ contract Library is Owner {
     function addBook(string memory _isbn,string memory _title,string memory _author,uint16 _copies) public isOwner {
         require(_copies > 0);
         Book memory book = Book(_isbn,_title,_author);
-        uint16 inStockCopies = inStockBooks[_isbn];
-        if (inStockCopies < 1){
+        if(registry[_isbn].count < 1){
             books.push(book);
-        } 
-        inStockBooks[_isbn] = _copies + inStockCopies;
+        }
+        registry[_isbn].count += _copies;
+        registry[_isbn].availability += _copies;
     }
 
     // availabales books, only; one in stock
@@ -55,7 +59,7 @@ contract Library is Owner {
         uint counter = 0;
         for (uint index = 0; index < books.length; index++) {
             string memory currISBN = books[index].isbn;
-            if (inStockBooks[currISBN] > 0) {
+            if (registry[currISBN].availability > 0) {
                 result[counter] = currISBN;
                 counter++;
             }
@@ -66,18 +70,17 @@ contract Library is Owner {
     function borrowBook(string memory _isbn) public existsBook(_isbn) existsCopies(_isbn) {
         require(usersBooks[msg.sender][_isbn] == false);
         usersBooks[msg.sender][_isbn] = true;
-        inStockBooks[_isbn]--;
+        registry[_isbn].availability--;
         borrowHistory[_isbn].push(msg.sender);
     }
 
-    function returnBook(string memory _isbn) public {
+    function returnBook(string memory _isbn) public existsBook(_isbn) {
         require(usersBooks[msg.sender][_isbn] == true);
-        inStockBooks[_isbn]++;
+        registry[_isbn].availability++;
         usersBooks[msg.sender][_isbn] = false;
     }
 
     function getBookBorrowHistory(string memory _isbn) public view returns(address[] memory) {
         return borrowHistory[_isbn];
     } 
-
 }
