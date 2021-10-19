@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
-
 import "./ownable.sol";
-
 
 /**
  * @title Library
@@ -10,31 +8,20 @@ import "./ownable.sol";
  */
 contract Library is Owner {
 
-    event NewBookAdded(Book book);
-    event BookBorrowed(Book book);
-    event BookReturned(Book book);
-    
-
     // conditions,
     // A user should not borrow more than one copy of a book at a time. 
     // The users should not be able to borrow a book more times than the copies in the libraries unless copy is returned.
     // Everyone should be able to see the addresses of all people that have ever borrowed a given book.
-    Book[] books;
+    Book[] private books;
     mapping (string => uint16) private inStockBooks;
     mapping (string => address[]) private borrowHistory;
     mapping (address => mapping(string => bool)) private usersBooks;
-    
-    // testing
-
-
-    // mapping (address => ) usersBooks;
     
 
     struct Book {
         string isbn;
         string title;
         string author;
-        // uint copies;
     }
  
     modifier existsCopies(string memory _isbn){
@@ -49,18 +36,17 @@ contract Library is Owner {
     constructor() {
         // test data
         addBook("1111", "Thinking in Bets", "Annie Duke", 1);
-        addBook("0000", "Fire and Blood", "George Martin", 2);
+        addBook("0000", "Fire and Blood", "George Martin", 1);
     }
 
     function addBook(string memory _isbn,string memory _title,string memory _author,uint16 _copies) public isOwner {
         require(_copies > 0);
-        
-        uint16 inStockCopies = inStockBooks[_isbn];
-        inStockBooks[_isbn] = _copies + inStockCopies;
-
         Book memory book = Book(_isbn,_title,_author);
-        emit NewBookAdded(book);
-        books.push(book);
+        uint16 inStockCopies = inStockBooks[_isbn];
+        if (inStockCopies < 1){
+            books.push(book);
+        } 
+        inStockBooks[_isbn] = _copies + inStockCopies;
     }
 
     // availabales books, only; one in stock
@@ -87,7 +73,7 @@ contract Library is Owner {
     function returnBook(string memory _isbn) public {
         require(usersBooks[msg.sender][_isbn] == true);
         inStockBooks[_isbn]++;
-
+        usersBooks[msg.sender][_isbn] = false;
     }
 
     function getBookBorrowHistory(string memory _isbn) public view returns(address[] memory) {
